@@ -64,8 +64,11 @@ The interface shows both the game AND the AI working together:
 
 ```
 ├── 🎮 simple_gesture_game.html    # Main working game (OPEN THIS!)
-├── 🦕 t-rex-runner/              # Chrome Dinosaur game files
-└── 📖 README.md                  # This file
+├── 🦕 index.html                 # T-Rex game main file
+├── 🎨 index.css                  # T-Rex game styles
+├── ⚡ index.js                   # T-Rex game logic
+├── 📁 assets/                    # T-Rex game assets (sprites, sounds)
+└── 📖 README.md                  # This documentation
 ```
 
 ## 🎥 Recording Tips for LinkedIn
