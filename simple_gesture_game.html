@@ -122,7 +122,7 @@
         </div>
 
         <div class="ai-area">
-            <h2>🤖 AI Hand Control</h2>
+            <!-- <h2>🤖 AI Hand Control</h2> -->
 
             <div id="videoContainer">
                 <video id="inputVideo" autoplay muted playsinline></video>
@@ -139,20 +139,13 @@
                 <span>Hand: <span id="handStatus">No hand detected</span></span>
             </div>
 
-            <div class="gesture-display" id="gestureDisplay">
-                Starting AI...
-            </div>
-
-            <div style="text-align: center;">
-                <div>Jumps: <span id="jumpCount">0</span></div>
-                <button onclick="testJump()">🚀 Test Jump</button>
-            </div>
+            <!-- Removed gesture display, jump counter, and test button for cleaner UI -->
         </div>
     </div>
 
     <script>
         let hands, camera, videoElement, canvasElement, canvasCtx;
-        let jumpCount = 0;
+        // Removed jumpCount variable as counter was removed
         let lastJumpTime = 0;
         let previousIndexUp = false;
 
@@ -171,7 +164,11 @@
                 // Initialize camera
                 console.log('Requesting camera access...');
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480 }
+                    video: {
+                        width: 480, // Reduced from 640 for better performance
+                        height: 360, // Reduced from 480 for better performance
+                        frameRate: 15 // Limit camera FPS to match processing
+                    }
                 });
                 videoElement.srcObject = stream;
 
@@ -187,7 +184,7 @@
             } catch (err) {
                 console.error('Camera error:', err);
                 document.getElementById('cameraStatus').textContent = 'Failed';
-                document.getElementById('gestureDisplay').textContent = '❌ Camera access required';
+                // Removed gestureDisplay element
             }
         }
 
@@ -202,9 +199,9 @@
 
             hands.setOptions({
                 maxNumHands: 1,
-                modelComplexity: 1,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
+                modelComplexity: 0, // Reduced from 1 to 0 for better performance
+                minDetectionConfidence: 0.4, // Slightly reduced for smoother tracking
+                minTrackingConfidence: 0.4  // Slightly reduced for smoother tracking
             });
 
             hands.onResults(onResults);
@@ -214,43 +211,59 @@
         }
 
         async function processVideo() {
-            console.log('Starting video processing loop...');
+            console.log('Starting optimized video processing...');
 
-            const processFrame = async () => {
-                if (videoElement.readyState === 4) {
-                    try {
-                        await hands.send({ image: videoElement });
-                    } catch (e) {
-                        console.error('Processing error:', e);
+            let lastProcessTime = 0;
+            const targetFPS = 15; // Reduced from ~30 to 15 FPS for better performance
+            const frameInterval = 1000 / targetFPS;
+
+            const processFrame = async (currentTime) => {
+                if (currentTime - lastProcessTime >= frameInterval) {
+                    if (videoElement.readyState === 4) {
+                        try {
+                            await hands.send({ image: videoElement });
+                            lastProcessTime = currentTime;
+                        } catch (e) {
+                            // Reduced error logging frequency
+                            if (Math.random() < 0.1) console.error('Processing error:', e);
+                        }
                     }
                 }
                 requestAnimationFrame(processFrame);
             };
 
-            processFrame();
+            requestAnimationFrame(processFrame);
         }
 
         function onResults(results) {
-            // Clear canvas
-            canvasCtx.save();
+            // Clear canvas (optimized)
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-            // Flip canvas to match video
+            canvasCtx.save();
             canvasCtx.scale(-1, 1);
             canvasCtx.translate(-canvasElement.width, 0);
 
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                document.getElementById('handLight').className = 'status-light green';
-                document.getElementById('handStatus').textContent = 'Detected';
+                // Update status efficiently
+                const handLight = document.getElementById('handLight');
+                const handStatus = document.getElementById('handStatus');
+                if (handLight.className !== 'status-light green') {
+                    handLight.className = 'status-light green';
+                    handStatus.textContent = 'Detected';
+                }
 
                 for (const landmarks of results.multiHandLandmarks) {
                     drawLandmarks(landmarks);
                     checkGesture(landmarks);
                 }
             } else {
-                document.getElementById('handLight').className = 'status-light red';
-                document.getElementById('handStatus').textContent = 'No hand detected';
-                document.getElementById('gestureDisplay').textContent = '👋 Show your hand';
+                // Update status efficiently
+                const handLight = document.getElementById('handLight');
+                const handStatus = document.getElementById('handStatus');
+                if (handLight.className !== 'status-light red') {
+                    handLight.className = 'status-light red';
+                    handStatus.textContent = 'No hand detected';
+                    // Removed gestureDisplay element
+                }
                 previousIndexUp = false;
             }
 
@@ -258,49 +271,48 @@
         }
 
         function drawLandmarks(landmarks) {
-            // Draw connections
-            canvasCtx.strokeStyle = '#00FF00';
-            canvasCtx.lineWidth = 2;
+            const width = canvasElement.width;
+            const height = canvasElement.height;
 
-            // Hand connections
-            const connections = [
-                [0, 1], [1, 2], [2, 3], [3, 4], // thumb
-                [0, 5], [5, 6], [6, 7], [7, 8], // index
-                [5, 9], [9, 10], [10, 11], [11, 12], // middle
-                [9, 13], [13, 14], [14, 15], [15, 16], // ring
-                [13, 17], [17, 18], [18, 19], [19, 20], // pinky
-                [0, 17] // wrist to pinky
-            ];
-
-            connections.forEach(([start, end]) => {
-                const startPoint = landmarks[start];
-                const endPoint = landmarks[end];
-
-                canvasCtx.beginPath();
-                canvasCtx.moveTo(startPoint.x * canvasElement.width, startPoint.y * canvasElement.height);
-                canvasCtx.lineTo(endPoint.x * canvasElement.width, endPoint.y * canvasElement.height);
-                canvasCtx.stroke();
-            });
-
-            // Check if index finger is up for visual feedback
+            // Optimized: Pre-calculate finger status
             const indexTip = landmarks[8];
             const indexPip = landmarks[6];
             const indexUp = indexTip.y < indexPip.y - 0.02;
 
-            // Draw points with special highlighting
-            landmarks.forEach((landmark, index) => {
-                const x = landmark.x * canvasElement.width;
-                const y = landmark.y * canvasElement.height;
+            // Draw simplified connections (key ones only for performance)
+            canvasCtx.strokeStyle = '#00FF00';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.beginPath();
 
-                // Special coloring for index finger
+            // Draw only key connections for performance
+            const keyConnections = [
+                [0, 5], [5, 6], [6, 7], [7, 8], // index finger only
+                [5, 9], [9, 13], [13, 17], [0, 17] // palm outline
+            ];
+
+            keyConnections.forEach(([start, end]) => {
+                const startPoint = landmarks[start];
+                const endPoint = landmarks[end];
+                canvasCtx.moveTo(startPoint.x * width, startPoint.y * height);
+                canvasCtx.lineTo(endPoint.x * width, endPoint.y * height);
+            });
+            canvasCtx.stroke();
+
+            // Draw key points only (optimized)
+            const keyPoints = [0, 5, 6, 7, 8]; // Wrist and index finger
+            keyPoints.forEach(index => {
+                const landmark = landmarks[index];
+                const x = landmark.x * width;
+                const y = landmark.y * height;
+
                 if (index === 8) {
-                    // Index finger tip - red if up, blue if down
+                    // Index finger tip - optimized drawing
                     canvasCtx.fillStyle = indexUp ? '#FF0000' : '#0000FF';
                     canvasCtx.beginPath();
                     canvasCtx.arc(x, y, 8, 0, 2 * Math.PI);
                     canvasCtx.fill();
 
-                    // Add text label
+                    // Optimized text drawing
                     canvasCtx.fillStyle = '#FFFFFF';
                     canvasCtx.font = 'bold 12px Arial';
                     canvasCtx.fillText(indexUp ? 'UP!' : 'DOWN', x - 15, y - 15);
@@ -308,10 +320,10 @@
                     // Index finger PIP joint
                     canvasCtx.fillStyle = '#FFFF00';
                     canvasCtx.beginPath();
-                    canvasCtx.arc(x, y, 5, 0, 2 * Math.PI);
+                    canvasCtx.arc(x, y, 4, 0, 2 * Math.PI);
                     canvasCtx.fill();
                 } else {
-                    // Other points
+                    // Other key points
                     canvasCtx.fillStyle = '#00FF00';
                     canvasCtx.beginPath();
                     canvasCtx.arc(x, y, 3, 0, 2 * Math.PI);
@@ -319,12 +331,12 @@
                 }
             });
 
-            // Draw gesture status on canvas
+            // Simplified status overlay
             canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            canvasCtx.fillRect(10, 10, 200, 30);
+            canvasCtx.fillRect(10, 10, 180, 25);
             canvasCtx.fillStyle = indexUp ? '#00FF00' : '#FF0000';
-            canvasCtx.font = 'bold 16px Arial';
-            canvasCtx.fillText(indexUp ? '☝️ FINGER UP!' : '👊 FINGER DOWN', 15, 30);
+            canvasCtx.font = 'bold 14px Arial';
+            canvasCtx.fillText(indexUp ? '☝️ UP!' : '👊 DOWN', 15, 28);
         }
 
         function checkGesture(landmarks) {
@@ -351,17 +363,13 @@
             // More lenient gesture: just check if index is clearly up
             const indexUp = indexExtended;
 
-            // Debug logging - this will help us see what's happening
-            console.log('Gesture Analysis:', {
-                indexTip: indexTip.y.toFixed(3),
-                indexPip: indexPip.y.toFixed(3),
-                indexDiff: (indexPip.y - indexTip.y).toFixed(3),
-                indexExtended: indexExtended,
-                middleClosed: middleClosed,
-                ringClosed: ringClosed,
-                finalGesture: indexUp,
-                previousState: previousIndexUp
-            });
+            // Reduced debug logging for performance (only log significant changes)
+            if (indexUp !== previousIndexUp) {
+                console.log('Gesture State Changed:', {
+                    fingerUp: indexUp,
+                    indexDiff: (indexPip.y - indexTip.y).toFixed(3)
+                });
+            }
 
             // Detect rising edge (finger just went up)
             if (indexUp && !previousIndexUp) {
@@ -371,17 +379,7 @@
 
             previousIndexUp = indexUp;
 
-            // Update display with more detailed feedback
-            if (indexUp) {
-                document.getElementById('gestureDisplay').textContent = '☝️ INDEX UP - READY TO JUMP!';
-                document.getElementById('gestureDisplay').style.background = 'linear-gradient(45deg, #2ed573, #1e90ff)';
-            } else if (indexExtended && (!middleClosed || !ringClosed)) {
-                document.getElementById('gestureDisplay').textContent = '✋ Close other fingers!';
-                document.getElementById('gestureDisplay').style.background = 'linear-gradient(45deg, #ffa726, #ff7043)';
-            } else {
-                document.getElementById('gestureDisplay').textContent = '👊 Lift index finger to jump';
-                document.getElementById('gestureDisplay').style.background = 'linear-gradient(45deg, #ff6b6b, #4ecdc4)';
-            }
+            // Removed gestureDisplay updates for cleaner UI
         }
 
         function makeJump() {
@@ -468,23 +466,12 @@
                 console.log('PostMessage failed:', e);
             }
 
-            jumpCount++;
             lastJumpTime = now;
-            document.getElementById('jumpCount').textContent = jumpCount;
 
-            // Visual feedback
-            document.getElementById('gestureDisplay').textContent = '🚀 JUMPING!';
-            setTimeout(() => {
-                if (previousIndexUp) {
-                    document.getElementById('gestureDisplay').textContent = '☝️ READY TO JUMP!';
-                }
-            }, 300);
+            // Removed visual feedback elements for cleaner UI
         }
 
-        function testJump() {
-            console.log('Manual test jump');
-            makeJump();
-        }
+        // Removed testJump function as test button was removed
 
         // Start the app
         window.addEventListener('load', initializeApp);
