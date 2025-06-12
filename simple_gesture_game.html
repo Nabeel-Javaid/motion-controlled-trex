@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple AI T-Rex Game</title>
+
+    <!-- Load MediaPipe from reliable CDN -->
+    <script src="https://unpkg.com/@mediapipe/hands@0.4.1675469240/hands.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            height: 100vh;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .game-area {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .ai-area {
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+        }
+
+        iframe {
+            width: 100%;
+            height: 500px;
+            border: none;
+            border-radius: 10px;
+        }
+
+        #videoContainer {
+            position: relative;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #inputVideo {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            transform: scaleX(-1);
+            /* Mirror video */
+        }
+
+        #outputCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .status-light {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .red {
+            background: #ff4444;
+        }
+
+        .green {
+            background: #44ff44;
+        }
+
+        .gesture-display {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        button {
+            background: #4ecdc4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="game-area">
+            <h2>🎮 T-Rex Game</h2>
+            <iframe src="t-rex-runner/index.html" id="gameFrame"></iframe>
+        </div>
+
+        <div class="ai-area">
+            <h2>🤖 AI Hand Control</h2>
+
+            <div id="videoContainer">
+                <video id="inputVideo" autoplay muted playsinline></video>
+                <canvas id="outputCanvas"></canvas>
+            </div>
+
+            <div class="status">
+                <span class="status-light" id="cameraLight"></span>
+                <span>Camera: <span id="cameraStatus">Starting...</span></span>
+            </div>
+
+            <div class="status">
+                <span class="status-light" id="handLight"></span>
+                <span>Hand: <span id="handStatus">No hand detected</span></span>
+            </div>
+
+            <div class="gesture-display" id="gestureDisplay">
+                Starting AI...
+            </div>
+
+            <div style="text-align: center;">
+                <div>Jumps: <span id="jumpCount">0</span></div>
+                <button onclick="testJump()">🚀 Test Jump</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let hands, camera, videoElement, canvasElement, canvasCtx;
+        let jumpCount = 0;
+        let lastJumpTime = 0;
+        let previousIndexUp = false;
+
+        async function initializeApp() {
+            console.log('Starting app initialization...');
+
+            videoElement = document.getElementById('inputVideo');
+            canvasElement = document.getElementById('outputCanvas');
+            canvasCtx = canvasElement.getContext('2d');
+
+            // Set canvas size
+            canvasElement.width = 350;
+            canvasElement.height = 200;
+
+            try {
+                // Initialize camera
+                console.log('Requesting camera access...');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 }
+                });
+                videoElement.srcObject = stream;
+
+                document.getElementById('cameraLight').className = 'status-light green';
+                document.getElementById('cameraStatus').textContent = 'Active';
+
+                // Wait for video to load
+                videoElement.onloadedmetadata = () => {
+                    console.log('Video loaded, initializing MediaPipe...');
+                    initializeMediaPipe();
+                };
+
+            } catch (err) {
+                console.error('Camera error:', err);
+                document.getElementById('cameraStatus').textContent = 'Failed';
+                document.getElementById('gestureDisplay').textContent = '❌ Camera access required';
+            }
+        }
+
+        function initializeMediaPipe() {
+            console.log('Creating MediaPipe Hands...');
+
+            hands = new Hands({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                }
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onResults);
+
+            console.log('MediaPipe initialized, starting processing...');
+            processVideo();
+        }
+
+        async function processVideo() {
+            console.log('Starting video processing loop...');
+
+            const processFrame = async () => {
+                if (videoElement.readyState === 4) {
+                    try {
+                        await hands.send({ image: videoElement });
+                    } catch (e) {
+                        console.error('Processing error:', e);
+                    }
+                }
+                requestAnimationFrame(processFrame);
+            };
+
+            processFrame();
+        }
+
+        function onResults(results) {
+            // Clear canvas
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            // Flip canvas to match video
+            canvasCtx.scale(-1, 1);
+            canvasCtx.translate(-canvasElement.width, 0);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                document.getElementById('handLight').className = 'status-light green';
+                document.getElementById('handStatus').textContent = 'Detected';
+
+                for (const landmarks of results.multiHandLandmarks) {
+                    drawLandmarks(landmarks);
+                    checkGesture(landmarks);
+                }
+            } else {
+                document.getElementById('handLight').className = 'status-light red';
+                document.getElementById('handStatus').textContent = 'No hand detected';
+                document.getElementById('gestureDisplay').textContent = '👋 Show your hand';
+                previousIndexUp = false;
+            }
+
+            canvasCtx.restore();
+        }
+
+        function drawLandmarks(landmarks) {
+            // Draw connections
+            canvasCtx.strokeStyle = '#00FF00';
+            canvasCtx.lineWidth = 2;
+
+            // Hand connections
+            const connections = [
+                [0, 1], [1, 2], [2, 3], [3, 4], // thumb
+                [0, 5], [5, 6], [6, 7], [7, 8], // index
+                [5, 9], [9, 10], [10, 11], [11, 12], // middle
+                [9, 13], [13, 14], [14, 15], [15, 16], // ring
+                [13, 17], [17, 18], [18, 19], [19, 20], // pinky
+                [0, 17] // wrist to pinky
+            ];
+
+            connections.forEach(([start, end]) => {
+                const startPoint = landmarks[start];
+                const endPoint = landmarks[end];
+
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(startPoint.x * canvasElement.width, startPoint.y * canvasElement.height);
+                canvasCtx.lineTo(endPoint.x * canvasElement.width, endPoint.y * canvasElement.height);
+                canvasCtx.stroke();
+            });
+
+            // Check if index finger is up for visual feedback
+            const indexTip = landmarks[8];
+            const indexPip = landmarks[6];
+            const indexUp = indexTip.y < indexPip.y - 0.02;
+
+            // Draw points with special highlighting
+            landmarks.forEach((landmark, index) => {
+                const x = landmark.x * canvasElement.width;
+                const y = landmark.y * canvasElement.height;
+
+                // Special coloring for index finger
+                if (index === 8) {
+                    // Index finger tip - red if up, blue if down
+                    canvasCtx.fillStyle = indexUp ? '#FF0000' : '#0000FF';
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(x, y, 8, 0, 2 * Math.PI);
+                    canvasCtx.fill();
+
+                    // Add text label
+                    canvasCtx.fillStyle = '#FFFFFF';
+                    canvasCtx.font = 'bold 12px Arial';
+                    canvasCtx.fillText(indexUp ? 'UP!' : 'DOWN', x - 15, y - 15);
+                } else if (index === 6) {
+                    // Index finger PIP joint
+                    canvasCtx.fillStyle = '#FFFF00';
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(x, y, 5, 0, 2 * Math.PI);
+                    canvasCtx.fill();
+                } else {
+                    // Other points
+                    canvasCtx.fillStyle = '#00FF00';
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(x, y, 3, 0, 2 * Math.PI);
+                    canvasCtx.fill();
+                }
+            });
+
+            // Draw gesture status on canvas
+            canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            canvasCtx.fillRect(10, 10, 200, 30);
+            canvasCtx.fillStyle = indexUp ? '#00FF00' : '#FF0000';
+            canvasCtx.font = 'bold 16px Arial';
+            canvasCtx.fillText(indexUp ? '☝️ FINGER UP!' : '👊 FINGER DOWN', 15, 30);
+        }
+
+        function checkGesture(landmarks) {
+            // Index finger landmarks
+            const indexTip = landmarks[8];   // tip
+            const indexPip = landmarks[6];   // middle joint (PIP)
+            const indexMcp = landmarks[5];   // base joint (MCP)
+
+            // Middle finger for comparison (to ensure other fingers are down)
+            const middleTip = landmarks[12];
+            const middlePip = landmarks[10];
+
+            // Ring finger for comparison
+            const ringTip = landmarks[16];
+            const ringPip = landmarks[14];
+
+            // Check if index finger is extended (tip much higher than PIP)
+            const indexExtended = indexTip.y < indexPip.y - 0.02; // More sensitive threshold
+
+            // Check if other fingers are closed (tips below their PIPs)
+            const middleClosed = middleTip.y > middlePip.y - 0.01;
+            const ringClosed = ringTip.y > ringPip.y - 0.01;
+
+            // More lenient gesture: just check if index is clearly up
+            const indexUp = indexExtended;
+
+            // Debug logging - this will help us see what's happening
+            console.log('Gesture Analysis:', {
+                indexTip: indexTip.y.toFixed(3),
+                indexPip: indexPip.y.toFixed(3),
+                indexDiff: (indexPip.y - indexTip.y).toFixed(3),
+                indexExtended: indexExtended,
+                middleClosed: middleClosed,
+                ringClosed: ringClosed,
+                finalGesture: indexUp,
+                previousState: previousIndexUp
+            });
+
+            // Detect rising edge (finger just went up)
+            if (indexUp && !previousIndexUp) {
+                console.log('🚀 JUMP GESTURE DETECTED! Index finger raised!');
+                makeJump();
+            }
+
+            previousIndexUp = indexUp;
+
+            // Update display with more detailed feedback
+            if (indexUp) {
+                document.getElementById('gestureDisplay').textContent = '☝️ INDEX UP - READY TO JUMP!';
+                document.getElementById('gestureDisplay').style.background = 'linear-gradient(45deg, #2ed573, #1e90ff)';
+            } else if (indexExtended && (!middleClosed || !ringClosed)) {
+                document.getElementById('gestureDisplay').textContent = '✋ Close other fingers!';
+                document.getElementById('gestureDisplay').style.background = 'linear-gradient(45deg, #ffa726, #ff7043)';
+            } else {
+                document.getElementById('gestureDisplay').textContent = '👊 Lift index finger to jump';
+                document.getElementById('gestureDisplay').style.background = 'linear-gradient(45deg, #ff6b6b, #4ecdc4)';
+            }
+        }
+
+        function makeJump() {
+            const now = Date.now();
+            if (now - lastJumpTime < 500) return; // Cooldown
+
+            console.log('Sending jump command...');
+
+            const gameFrame = document.getElementById('gameFrame');
+
+            // Method 1: Focus iframe and send events
+            try {
+                gameFrame.focus();
+                gameFrame.contentWindow.focus();
+
+                // Send multiple event types for better compatibility
+                const events = [
+                    new KeyboardEvent('keydown', { key: ' ', code: 'Space', keyCode: 32, which: 32, bubbles: true }),
+                    new KeyboardEvent('keypress', { key: ' ', code: 'Space', keyCode: 32, which: 32, bubbles: true }),
+                    new KeyboardEvent('keyup', { key: ' ', code: 'Space', keyCode: 32, which: 32, bubbles: true })
+                ];
+
+                events.forEach(event => {
+                    gameFrame.contentWindow.document.dispatchEvent(event);
+                    gameFrame.contentDocument.dispatchEvent(event);
+                });
+
+                console.log('Events sent to iframe');
+            } catch (e) {
+                console.log('Iframe method failed:', e);
+            }
+
+            // Method 2: Direct manipulation
+            try {
+                // Try to trigger the game directly
+                const iframeDoc = gameFrame.contentDocument || gameFrame.contentWindow.document;
+                const runner = gameFrame.contentWindow.Runner;
+
+                if (runner && runner.instance) {
+                    // Direct game control
+                    runner.instance.onKeyDown({ keyCode: 32, type: 'keydown' });
+                    console.log('Direct game control used');
+                } else {
+                    console.log('Runner not found, trying alternative');
+                }
+            } catch (e) {
+                console.log('Direct method failed:', e);
+            }
+
+            // Method 3: Simulate mouse click on spacebar area
+            try {
+                const iframeDoc = gameFrame.contentDocument || gameFrame.contentWindow.document;
+                const gameCanvas = iframeDoc.querySelector('canvas') || iframeDoc.querySelector('.runner-canvas');
+
+                if (gameCanvas) {
+                    // Simulate click to ensure focus
+                    const clickEvent = new MouseEvent('click', { bubbles: true });
+                    gameCanvas.dispatchEvent(clickEvent);
+
+                    // Then send spacebar
+                    setTimeout(() => {
+                        const spaceEvent = new KeyboardEvent('keydown', {
+                            key: ' ', code: 'Space', keyCode: 32, which: 32, bubbles: true
+                        });
+                        gameCanvas.dispatchEvent(spaceEvent);
+                        iframeDoc.dispatchEvent(spaceEvent);
+                    }, 10);
+
+                    console.log('Canvas click + spacebar sent');
+                }
+            } catch (e) {
+                console.log('Canvas method failed:', e);
+            }
+
+            // Method 4: PostMessage API
+            try {
+                gameFrame.contentWindow.postMessage({
+                    type: 'keydown',
+                    keyCode: 32,
+                    key: ' '
+                }, '*');
+                console.log('PostMessage sent');
+            } catch (e) {
+                console.log('PostMessage failed:', e);
+            }
+
+            jumpCount++;
+            lastJumpTime = now;
+            document.getElementById('jumpCount').textContent = jumpCount;
+
+            // Visual feedback
+            document.getElementById('gestureDisplay').textContent = '🚀 JUMPING!';
+            setTimeout(() => {
+                if (previousIndexUp) {
+                    document.getElementById('gestureDisplay').textContent = '☝️ READY TO JUMP!';
+                }
+            }, 300);
+        }
+
+        function testJump() {
+            console.log('Manual test jump');
+            makeJump();
+        }
+
+        // Start the app
+        window.addEventListener('load', initializeApp);
+
+        // Setup iframe communication when loaded
+        document.getElementById('gameFrame').addEventListener('load', function () {
+            console.log('Game iframe loaded');
+
+            setTimeout(() => {
+                // Focus the iframe
+                this.focus();
+                this.contentWindow.focus();
+
+                // Click inside the game to ensure it's active
+                try {
+                    const iframeDoc = this.contentDocument || this.contentWindow.document;
+                    const gameCanvas = iframeDoc.querySelector('canvas') || iframeDoc.querySelector('.runner-canvas') || iframeDoc.body;
+
+                    if (gameCanvas) {
+                        const clickEvent = new MouseEvent('click', { bubbles: true });
+                        gameCanvas.dispatchEvent(clickEvent);
+                        console.log('Initial click sent to activate game');
+                    }
+
+                    // Test if the game responds to spacebar
+                    setTimeout(() => {
+                        const testEvent = new KeyboardEvent('keydown', {
+                            key: ' ', code: 'Space', keyCode: 32, which: 32, bubbles: true
+                        });
+                        this.contentWindow.document.dispatchEvent(testEvent);
+                        console.log('Test spacebar sent to game');
+                    }, 500);
+
+                } catch (e) {
+                    console.log('Iframe setup error:', e);
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+
+</html>

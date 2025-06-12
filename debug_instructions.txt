@@ -1,0 +1,67 @@
+🔧 DEBUGGING GUIDE - T-Rex Gesture Control
+===========================================
+
+If the gesture control isn't working, follow these steps:
+
+1. OPEN THE BROWSER CONSOLE
+   - Right-click on the page → "Inspect" → "Console" tab
+   - This will show debug messages
+
+2. CHECK CAMERA ACCESS
+   - Make sure you clicked "Allow" when browser asked for camera permission
+   - You should see yourself in the camera feed on the right side
+
+3. TEST MANUAL JUMP
+   - Click the "🚀 Test Jump" button
+   - If this works, the game communication is fine
+   - If this doesn't work, there's an iframe issue
+
+4. CHECK HAND DETECTION
+   - Hold your hand in front of camera
+   - You should see green lines/dots drawn on your hand
+   - Check console for debug messages showing hand coordinates
+
+5. TEST GESTURE DETECTION
+   - Make a fist (all fingers closed)
+   - Slowly lift your index finger while keeping others closed
+   - Watch the status text change
+   - Check console for gesture detection logs
+
+6. COMMON ISSUES & FIXES:
+
+   a) No camera feed:
+      - Refresh page and allow camera access
+      - Try different browser (Chrome works best)
+      - Check if another app is using camera
+
+   b) Hand detected but no gesture:
+      - Make sure you lift ONLY index finger
+      - Keep other fingers clearly closed
+      - Try better lighting
+      - Adjust distance from camera (1-2 feet)
+
+   c) Gesture detected but T-Rex doesn't jump:
+      - Check console for "JUMP DETECTED" messages
+      - Try clicking "Test Jump" button
+      - Make sure game iframe is loaded
+      - Try clicking inside the game area first
+
+7. CONSOLE DEBUG MESSAGES TO LOOK FOR:
+   - "Camera status: active" - camera working
+   - "Hand detection: active" - hand tracking working
+   - "indexExtended: true" - finger position detected
+   - "JUMP DETECTED!" - gesture recognized
+   - "Event sent to iframe" - jump command sent
+
+8. PERFECT GESTURE TECHNIQUE:
+   - Start with closed fist
+   - Quickly extend index finger up
+   - Keep other fingers closed
+   - Lower index finger back down
+   - Repeat for each jump
+
+If nothing works, try:
+- Refresh the page
+- Use Chrome browser
+- Check internet connection (MediaPipe loads from CDN)
+- Try the Python version: python gesture_control.py 
