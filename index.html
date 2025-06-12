@@ -45,49 +45,40 @@
 
     // Listen for PostMessage from gesture control
     window.addEventListener('message', function (event) {
-        console.log('T-Rex game received PostMessage:', event.data);
+        // Hide message box if still visible
+        var box = document.getElementById("messageBox");
+        if (box) {
+            box.style.visibility = "hidden";
+        }
 
-        if (event.data && event.data.type === 'keydown' && event.data.keyCode === 32) {
-            console.log('Processing jump command from gesture control...');
+        // Create and dispatch spacebar event
+        var spaceEvent = new KeyboardEvent('keydown', {
+            key: ' ',
+            code: 'Space',
+            keyCode: 32,
+            which: 32,
+            bubbles: true
+        });
 
-            // Hide message box if still visible
-            var box = document.getElementById("messageBox");
-            if (box) {
-                box.style.visibility = "hidden";
-            }
+        document.dispatchEvent(spaceEvent);
 
-            // Create and dispatch spacebar event
-            var spaceEvent = new KeyboardEvent('keydown', {
+        // Also try keyup for complete key press simulation
+        setTimeout(function () {
+            var spaceUpEvent = new KeyboardEvent('keyup', {
                 key: ' ',
                 code: 'Space',
                 keyCode: 32,
                 which: 32,
                 bubbles: true
             });
-
-            document.dispatchEvent(spaceEvent);
-            console.log('Jump event dispatched successfully!');
-
-            // Also try keyup for complete key press simulation
-            setTimeout(function () {
-                var spaceUpEvent = new KeyboardEvent('keyup', {
-                    key: ' ',
-                    code: 'Space',
-                    keyCode: 32,
-                    which: 32,
-                    bubbles: true
-                });
-                document.dispatchEvent(spaceUpEvent);
-            }, 50);
-        }
+            document.dispatchEvent(spaceUpEvent);
+        }, 50);
     });
 
     // Also listen for direct focus and manual events
     window.addEventListener('focus', function () {
-        console.log('T-Rex game window focused');
+        // Silent focus handling
     });
-
-    console.log('T-Rex game: PostMessage listener initialized');
 </script>
 
 </html>

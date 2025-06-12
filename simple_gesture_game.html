@@ -150,8 +150,6 @@
         let previousIndexUp = false;
 
         async function initializeApp() {
-            console.log('Starting app initialization...');
-
             videoElement = document.getElementById('inputVideo');
             canvasElement = document.getElementById('outputCanvas');
             canvasCtx = canvasElement.getContext('2d');
@@ -162,7 +160,6 @@
 
             try {
                 // Initialize camera
-                console.log('Requesting camera access...');
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         width: 480, // Reduced from 640 for better performance
@@ -177,20 +174,16 @@
 
                 // Wait for video to load
                 videoElement.onloadedmetadata = () => {
-                    console.log('Video loaded, initializing MediaPipe...');
                     initializeMediaPipe();
                 };
 
             } catch (err) {
-                console.error('Camera error:', err);
                 document.getElementById('cameraStatus').textContent = 'Failed';
                 // Removed gestureDisplay element
             }
         }
 
         function initializeMediaPipe() {
-            console.log('Creating MediaPipe Hands...');
-
             hands = new Hands({
                 locateFile: (file) => {
                     return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
@@ -206,13 +199,10 @@
 
             hands.onResults(onResults);
 
-            console.log('MediaPipe initialized, starting processing...');
             processVideo();
         }
 
         async function processVideo() {
-            console.log('Starting optimized video processing...');
-
             let lastProcessTime = 0;
             const targetFPS = 15; // Reduced from ~30 to 15 FPS for better performance
             const frameInterval = 1000 / targetFPS;
@@ -224,8 +214,7 @@
                             await hands.send({ image: videoElement });
                             lastProcessTime = currentTime;
                         } catch (e) {
-                            // Reduced error logging frequency
-                            if (Math.random() < 0.1) console.error('Processing error:', e);
+                            // Silent error handling for performance
                         }
                     }
                 }
@@ -364,16 +353,18 @@
             const indexUp = indexExtended;
 
             // Reduced debug logging for performance (only log significant changes)
-            if (indexUp !== previousIndexUp) {
-                console.log('Gesture State Changed:', {
-                    fingerUp: indexUp,
-                    indexDiff: (indexPip.y - indexTip.y).toFixed(3)
-                });
-            }
+            // if (indexUp !== previousIndexUp) {
+            //     console.log('Gesture State Changed:'
+            //     , 
+            //     {
+            //         fingerUp: indexUp,
+            //         indexDiff: (indexPip.y - indexTip.y).toFixed(3)
+            //     });
+            // }
 
             // Detect rising edge (finger just went up)
             if (indexUp && !previousIndexUp) {
-                console.log('🚀 JUMP GESTURE DETECTED! Index finger raised!');
+                // console.log('🚀 JUMP GESTURE DETECTED! Index finger raised!');
                 makeJump();
             }
 
@@ -386,7 +377,7 @@
             const now = Date.now();
             if (now - lastJumpTime < 500) return; // Cooldown
 
-            console.log('Sending jump command...');
+            // console.log('Sending jump command...');
 
             const gameFrame = document.getElementById('gameFrame');
 
@@ -407,9 +398,8 @@
                     gameFrame.contentDocument.dispatchEvent(event);
                 });
 
-                console.log('Events sent to iframe');
             } catch (e) {
-                console.log('Iframe method failed:', e);
+                // Silent error handling
             }
 
             // Method 2: Direct manipulation
@@ -421,12 +411,9 @@
                 if (runner && runner.instance) {
                     // Direct game control
                     runner.instance.onKeyDown({ keyCode: 32, type: 'keydown' });
-                    console.log('Direct game control used');
-                } else {
-                    console.log('Runner not found, trying alternative');
                 }
             } catch (e) {
-                console.log('Direct method failed:', e);
+                // Silent error handling
             }
 
             // Method 3: Simulate mouse click on spacebar area
@@ -448,10 +435,9 @@
                         iframeDoc.dispatchEvent(spaceEvent);
                     }, 10);
 
-                    console.log('Canvas click + spacebar sent');
                 }
             } catch (e) {
-                console.log('Canvas method failed:', e);
+                // Silent error handling
             }
 
             // Method 4: PostMessage API
@@ -461,9 +447,8 @@
                     keyCode: 32,
                     key: ' '
                 }, '*');
-                console.log('PostMessage sent');
             } catch (e) {
-                console.log('PostMessage failed:', e);
+                // Silent error handling
             }
 
             lastJumpTime = now;
@@ -478,8 +463,6 @@
 
         // Setup iframe communication when loaded
         document.getElementById('gameFrame').addEventListener('load', function () {
-            console.log('Game iframe loaded');
-
             setTimeout(() => {
                 // Focus the iframe
                 this.focus();
@@ -493,7 +476,6 @@
                     if (gameCanvas) {
                         const clickEvent = new MouseEvent('click', { bubbles: true });
                         gameCanvas.dispatchEvent(clickEvent);
-                        console.log('Initial click sent to activate game');
                     }
 
                     // Test if the game responds to spacebar
@@ -502,11 +484,10 @@
                             key: ' ', code: 'Space', keyCode: 32, which: 32, bubbles: true
                         });
                         this.contentWindow.document.dispatchEvent(testEvent);
-                        console.log('Test spacebar sent to game');
                     }, 500);
 
                 } catch (e) {
-                    console.log('Iframe setup error:', e);
+                    // Silent error handling
                 }
             }, 1000);
         });
