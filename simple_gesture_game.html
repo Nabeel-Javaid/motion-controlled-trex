@@ -301,10 +301,7 @@
                     canvasCtx.arc(x, y, 8, 0, 2 * Math.PI);
                     canvasCtx.fill();
 
-                    // Optimized text drawing
-                    canvasCtx.fillStyle = '#FFFFFF';
-                    canvasCtx.font = 'bold 12px Arial';
-                    canvasCtx.fillText(indexUp ? 'UP!' : 'DOWN', x - 15, y - 15);
+                    // Optimized text drawing removed
                 } else if (index === 6) {
                     // Index finger PIP joint
                     canvasCtx.fillStyle = '#FFFF00';
@@ -320,12 +317,7 @@
                 }
             });
 
-            // Simplified status overlay
-            canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            canvasCtx.fillRect(10, 10, 180, 25);
-            canvasCtx.fillStyle = indexUp ? '#00FF00' : '#FF0000';
-            canvasCtx.font = 'bold 14px Arial';
-            canvasCtx.fillText(indexUp ? '☝️ UP!' : '👊 DOWN', 15, 28);
+            // Simplified status overlay removed
         }
 
         function checkGesture(landmarks) {
